@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+sentence-transformers
+chromadb
+numpy
+scikit-learn
+nltk
+transformers
+beautifulsoup4
+pypdf
+torch

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  rag-api:
+    build: .
+    container_name: advanced-rag-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./chroma_db:/app/chroma_db
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1

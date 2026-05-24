@@ -14,6 +14,7 @@ class DocumentChunk(BaseModel):
 
 class QueryRequest(BaseModel):
     user_query: str
+    session_id: Optional[str] = None
     top_k: int = 4
     use_hyde: bool = True
 

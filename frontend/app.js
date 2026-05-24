@@ -1,5 +1,8 @@
 const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
+// Generate a unique session ID for conversation memory
+const sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+
 // DOM Elements
 const ingestForm = document.getElementById('ingest-form');
 const ingestBtn = document.getElementById('ingest-btn');
@@ -82,21 +85,62 @@ queryForm.addEventListener('submit', async (e) => {
     resultsContainer.classList.add('hidden');
 
     try {
-        const response = await fetch(`${API_BASE}/query`, {
+        const response = await fetch(`${API_BASE}/query/stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_query: query, use_hyde: useHyde, top_k: 3 })
+            body: JSON.stringify({ 
+                user_query: query, 
+                use_hyde: useHyde, 
+                top_k: 3,
+                session_id: sessionId
+            })
         });
 
-        const data = await response.json();
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Failed to execute query');
+        }
 
-        if (response.ok) {
-            renderResults(data);
-        } else {
-            alert(`Error: ${data.detail || 'Failed to execute query'}`);
+        resultsContainer.classList.remove('hidden');
+        answerContent.innerHTML = "<p></p>";
+        const pTag = answerContent.querySelector("p");
+        let answerText = "";
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            
+            let eventEndIndex;
+            while ((eventEndIndex = buffer.indexOf('\n\n')) >= 0) {
+                const eventStr = buffer.substring(0, eventEndIndex);
+                buffer = buffer.substring(eventEndIndex + 2);
+                
+                const eventMatch = eventStr.match(/event:\s*(.*)/);
+                const dataMatch = eventStr.match(/data:\s*(.*)/);
+                
+                if (eventMatch && dataMatch) {
+                    const currentEvent = eventMatch[1];
+                    const dataStr = dataMatch[1];
+                    
+                    if (currentEvent === 'metadata') {
+                        const meta = JSON.parse(dataStr);
+                        renderSources(meta);
+                    } else if (currentEvent === 'token') {
+                        const tokenData = JSON.parse(dataStr);
+                        answerText += tokenData.token;
+                        pTag.textContent = answerText;
+                    }
+                }
+            }
         }
     } catch (error) {
-        alert('Network error: Make sure the server is running.');
+        alert(`Error: ${error.message}`);
         console.error(error);
     } finally {
         // UI Reset state
@@ -106,18 +150,14 @@ queryForm.addEventListener('submit', async (e) => {
     }
 });
 
-function renderResults(data) {
-    // Render Answer
-    answerContent.innerHTML = `<p>${data.generated_answer}</p>`;
-
-    // Render Sources
+function renderSources(results) {
     sourcesContent.innerHTML = '';
-    data.results.forEach((result, index) => {
+    results.forEach((result, index) => {
         const sourceHtml = `
             <div class="source-item" style="animation: slideUp ${0.3 + (index * 0.1)}s ease">
                 <div class="source-meta">
-                    <span class="source-name">📄 ${result.metadata.source}</span>
-                    <span class="source-chunk">Chunk ID: ${result.metadata.chunk_id.substring(0, 8)}...</span>
+                    <span class="source-name">📄 ${result.source}</span>
+                    <span class="source-chunk">Chunk ID: ${result.chunk_id.substring(0, 8)}...</span>
                 </div>
                 <div class="source-content">
                     "${result.content}"
@@ -126,6 +166,4 @@ function renderResults(data) {
         `;
         sourcesContent.insertAdjacentHTML('beforeend', sourceHtml);
     });
-
-    resultsContainer.classList.remove('hidden');
 }

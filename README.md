@@ -1,52 +1,135 @@
-# Advanced Production RAG
+# 🚀 Advanced Production RAG 
 
-This is a highly-performant, modular Advanced Retrieval-Augmented Generation (RAG) pipeline built entirely from scratch in Python, without relying on wrapper frameworks like LangChain or LlamaIndex.
+![Python](https://img.shields.io/badge/Python-3.12%2B-blue?style=for-the-badge&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.103%2B-009688?style=for-the-badge&logo=fastapi)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
+![Status](https://img.shields.io/badge/Status-Production_Ready-success?style=for-the-badge)
 
-## Features
-- **Semantic Chunking**: Dynamically splits documents into chunks based on semantic cosine distance percentiles using NLTK and sentence-transformers.
-- **Dual-Path Hybrid Retrieval**: 
-  - **Dense**: Local vector storage using ChromaDB.
-  - **Sparse**: Custom from-scratch BM25Okapi implementation with advanced Regex tokenization.
-- **Reciprocal Rank Fusion (RRF)**: Merges sparse and dense search results.
-- **Cross-Encoder Re-ranking**: Uses a lightweight local cross-encoder model to determine the absolute highest-scoring contexts.
-- **FastAPI Layer**: Exposes the system through clean, strongly-typed REST API endpoints.
+A fully stateless-to-stateful, enterprise-grade **Retrieval-Augmented Generation (RAG)** system built completely from scratch in Python. 
 
-## 🚀 Getting Started
+**Zero LangChain. Zero LlamaIndex. Zero External API Keys.**
 
-### 1. Installation
+This project demonstrates how to build the core orchestration layers of an advanced AI retrieval and generation engine using raw Python, NumPy, ChromaDB, and local HuggingFace models, culminating in a beautiful, streaming Vanilla HTML/JS frontend.
 
-First, ensure you have Python installed. Then, install the required dependencies:
+---
+
+## ✨ Enterprise Features
+
+- **100% Local & Private**: Runs entirely on your machine using lightweight local models (`all-MiniLM-L6-v2`, `ms-marco-MiniLM-L-6-v2`, `flan-t5-small`).
+- **Hybrid Search Engine**: Custom-built TF-IDF/BM25 sparse retrieval combined with Dense Vector retrieval via ChromaDB.
+- **Reciprocal Rank Fusion (RRF)**: Mathematically merges sparse and dense retrieval candidate lists for superior recall.
+- **Cross-Encoder Re-Ranking**: Ranks the fused candidates using an absolute contextual relevance score.
+- **HyDE (Hypothetical Document Embeddings)**: Uses the local T5 model to generate a hypothetical "perfect" document to drastically improve vector similarity matching before executing the search.
+- **Conversation Memory**: Tracks session history and automatically rewrites follow-up questions into standalone search queries.
+- **Server-Sent Events (SSE) Streaming**: Streams the LLM generation token-by-token directly to the UI.
+- **Async Batch Ingestion**: Upload massive PDFs or HTML documents without blocking the main thread using FastAPI Background Tasks.
+- **State Persistence**: Serializes the BM25 index and vector DB to disk so your data survives server reboots.
+
+---
+
+## 🏗 Architecture
+
+```mermaid
+graph TD
+    User([User / Web UI]) -->|Query| API[FastAPI Server]
+    User -->|Documents| Ingest[Ingestion Pipeline]
+    
+    subgraph "Ingestion Layer"
+        Ingest --> Parser[Parser: PDF, HTML, TXT]
+        Parser --> Chunker[Semantic Chunker]
+        Chunker -->|Tokens| BM25[BM25 Index]
+        Chunker -->|Embeddings| Chroma[ChromaDB]
+    end
+    
+    subgraph "Retrieval Layer"
+        API --> Memory[Memory: Query Rewriter]
+        Memory --> HyDE[HyDE Generator]
+        HyDE --> BM25
+        HyDE --> Chroma
+        BM25 -->|Candidates| RRF[Reciprocal Rank Fusion]
+        Chroma -->|Candidates| RRF
+        RRF --> Rerank[Cross-Encoder Reranker]
+    end
+    
+    subgraph "Generation Layer"
+        Rerank -->|Top K Context| Generator[Local T5 Generator]
+        Generator -->|SSE Stream| API
+    end
+```
+
+---
+
+## 🚀 Quickstart
+
+### Option A: Local Installation
+
+1. **Clone and setup the environment:**
+   ```bash
+   git clone <repository_url>
+   cd "Advanced production RAG"
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Start the FastAPI Server:**
+   ```bash
+   python -m uvicorn src.main:app --reload
+   ```
+
+4. **Launch the Web UI:**
+   Simply double-click `frontend/index.html` in your web browser. No npm, no node_modules!
+
+### Option B: Docker Deployment
+
+The project includes a `Dockerfile` and `docker-compose.yml` for instant, isolated deployment.
 
 ```bash
-pip install -r requirements.txt
+docker-compose up --build -d
+```
+*Note: Your indexes will automatically persist to the `./data` and `./chroma_db` mounted volumes.*
+
+---
+
+## 📂 Project Structure
+
+```text
+📦 Advanced production RAG
+ ┣ 📂 data                  # Persistent BM25 State
+ ┣ 📂 chroma_db             # Persistent Vector DB
+ ┣ 📂 frontend              # Premium Vanilla Web App
+ ┃ ┣ 📜 index.html
+ ┃ ┣ 📜 index.css
+ ┃ ┗ 📜 app.js
+ ┣ 📂 src
+ ┃ ┣ 📂 ingestion           # Parsing & Semantic Chunking
+ ┃ ┣ 📂 retrieval           # Dense, Sparse, & Hybrid Search
+ ┃ ┣ 📂 ranking             # Cross-Encoder Reranker
+ ┃ ┣ 📂 generation          # T5 LLM & HyDE
+ ┃ ┣ 📂 evaluation          # Offline RAG Evaluator
+ ┃ ┣ 📜 main.py             # FastAPI Orchestrator
+ ┃ ┗ 📜 schema.py           # Pydantic Data Models
+ ┣ 📜 requirements.txt
+ ┣ 📜 Dockerfile
+ ┗ 📜 docker-compose.yml
 ```
 
-### 2. Start the Server
+---
 
-Run the following command to start the FastAPI server. 
+## 💻 API Documentation
 
-*Note: The first time you run this, it will take a few moments to download the lightweight AI models (under 100MB each). Wait until you see `INFO: Application startup complete.` before proceeding to step 3.*
+When running locally, full interactive API documentation is automatically generated by FastAPI at:
+👉 **[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)**
 
-```bash
-python -m uvicorn src.main:app --reload
-```
+### Key Endpoints
+- `POST /api/v1/ingest/async` - Upload raw text, PDFs, or HTML for background processing.
+- `GET /api/v1/ingest/status/{task_id}` - Check the status of a background ingestion job.
+- `POST /api/v1/query/stream` - Primary conversational endpoint utilizing SSE to stream answers.
 
-### 3. Usage
+---
 
-Leave the server running in your terminal. Open a **new, separate terminal window** (Command Prompt or PowerShell) to interact with the API.
-
-#### Ingesting Data
-
-Add a document to the knowledge base:
-
-```cmd
-curl.exe -X POST "http://127.0.0.1:8000/api/v1/ingest" -H "Content-Type: application/json" -d "{\"text\": \"Artificial intelligence is a fascinating field. It relies heavily on advanced RAG systems. RAG stands for Retrieval-Augmented Generation, which is what we are building right now!\", \"source\": \"test_document.txt\"}"
-```
-
-#### Querying the RAG
-
-Ask a question against your indexed documents:
-
-```cmd
-curl.exe -X POST "http://127.0.0.1:8000/api/v1/query" -H "Content-Type: application/json" -d "{\"user_query\": \"What does RAG stand for?\", \"top_k\": 4}"
-```
+*Built for advanced learning, portfolio demonstration, and production deployment.*
